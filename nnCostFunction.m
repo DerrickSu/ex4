@@ -1,4 +1,4 @@
-function [J grad] = nnCostFunction(nn_params, ...
+function [J ,grad] = nnCostFunction(nn_params, ...
                                    input_layer_size, ...
                                    hidden_layer_size, ...
                                    num_labels, ...
@@ -63,41 +63,52 @@ Theta2_grad = zeros(size(Theta2));
 %
 
 %  first step : forward propogation
-%z_2 = zeros(size(Theta1 , 1),m);
 X = [ones(m,1) , X];
-z_2 = Theta1 * X' ; 
-%a_2 = zeros(size(Theta1 , 1),m);  % a_2 is a matrix by n * m where m is row of X , n is feature
-a_2 = sigmoid(z_2) ;
-a_2 = [ones(1, size(a_2 , 2));a_2] ;
-
-%z_3 = zeros(size(Theta2 , 1), m) ;
-%a_3 = zeros(size(Theta2 , 1), m);
-z_3 = Theta2 * a_2 ; % Theta2 is k*n+1 matrix where k is number of y label
-a_3 = sigmoid(z_3) ;  %a_3 is a matrix by k*m , where n is layer 2's item
+% z_2 =  Theta1 * X' ;
+% a_2 is a matrix by n * m where m is row of X , n is feature
+% a_2 = sigmoid(z_2) ;
+% a_2 = [ones(1, m);a_2] ;
+% z_3 = Theta2 * a_2 ;  % Theta2 is k*n+1 matrix where k is number of y label
+% a_3 = sigmoid(z_3)
+a_3 = sigmoid(Theta2 * [ones(1, m);sigmoid(Theta1 * X')]) ;  % a_3 is a matrix by k*m , where n is layer 2's item
 
 for ( i = 1:num_labels)
     xy = a_3(: , y ==i) ;
     y_1 = zeros(1 , num_labels) ;
     y_1(i) = 1 ;
     
-    J = J -1/m*( sum (y_1 *log(xy) + (1- y_1)* log(1 - xy))  );
+    J = J -1/m*( sum (y_1 *log(xy) + (1- y_1)* log(1 - xy)) ) ;
 end;
+% regularization
+% don't add theta0 ^2
+J = J + lambda/(2*m) * (sum(sum(Theta1(:,2:end).^2)) + sum(sum(Theta2(:,2:end).^2)) );
 
+% step 2 : compute error
+% compute every obs of x
+delta_2 = zeros(size(Theta2)) ;
+delta_1 = zeros(size(Theta1));
+for(i = 1:m )
+   
+    yy = zeros(num_labels , 1) ;
+    yy(y(i)) = 1 ;
+    % layer 2 
+    z2 = Theta1 * X(i,:)' ;       % z2 is n * 1 vector
+    a2 = [1 ; sigmoid(z2)] ;
+    
+    % layer 3 (output layer)
+    z3 = Theta2 * a2;         % z3 is num_label * 1 vector
+    a3 = sigmoid(z3);
+    error_3 = a3 - yy;        % num_label * 1
+    error_2 =  (Theta2')* error_3 ; % layer2 nodes number
+    error_2(2:end) =error_2(2:end).*sigmoidGradient(z2);                      
+    delta_2 = delta_2 + error_3 * a2';    % labels * layer2's nodes  
+    delta_1 = delta_1 + error_2(2:end) * X(i,:);    % layer2's nodes -1 * col of X +1
+end;                        % remove bias term , then dimension is correct
 
- 
-
-
-
-
-
-
-
-
-
-
-
-
-
+Theta1_grad = (1/m) * delta_1 + ...
+    lambda/m *[zeros(size(delta_1,1),1) , Theta1(:,2:end)] ;
+Theta2_grad = (1/m) * delta_2 + ...
+    lambda/m *[zeros(size(delta_2,1),1) , Theta2(:,2:end)] ;
 
 
 
